@@ -5,7 +5,7 @@ on:
     branches: [cicd]
   workflow_dispatch:
 
-throughout the workflow if we want any env variables to define we weill put only in this session
+# throughout the workflow if we want any env variables to define we weill put only in this session
 env:
   AWS_REGION: us-east-1
   S3_BUCKET: churn-model-bucket-cicd-abhi
@@ -15,8 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write  # Required to push commits
-permission write ichamu ante github actions ki manam left side lo unna files annitlo github actions ki write permission ichinatte
-general ga mana read permission ea istam by default emi ivvakapothe read annatu but ikkada delibarate ga write ichamu ee job ki
+# permission write ichamu ante github actions ki manam left side lo unna files annitlo github actions ki write permission ichinatte
+# general ga mana read permission ea istam by default emi ivvakapothe read annatu but ikkada delibarate ga write ichamu ee job ki
     
     steps:
     - name: Checkout code
@@ -45,11 +45,11 @@ general ga mana read permission ea istam by default emi ivvakapothe read annatu 
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
-      ee screts repo settings ki valthe screts and variables and vastadi akkada actions slect chaskoni repository secrets ki valli
-      create chaskoni scret name = AWS_ACCESS_KEY_ID , scret = awskeyid lo vachina key id and new secret add chaskoni
-      scret name = AWS_SECRET_ACCESS_KEY , scret = awsscretaccesskey ivvali appudu run ayinappudu akkadanunchi tiskuntadii
-      built in scret storage undi actions ki 
-      same variables ki kuda chaskovachu
+     # ee screts repo settings ki valthe screts and variables and vastadi akkada actions slect chaskoni repository secrets ki valli
+     # create chaskoni scret name = AWS_ACCESS_KEY_ID , scret = awskeyid lo vachina key id and new secret add chaskoni
+     # scret name = AWS_SECRET_ACCESS_KEY , scret = awsscretaccesskey ivvali appudu run ayinappudu akkadanunchi tiskuntadii
+    #  built in scret storage undi actions ki 
+    #  same variables ki kuda chaskovachu
     
     - name: Push model to S3 directly
       run: |
@@ -60,9 +60,9 @@ general ga mana read permission ea istam by default emi ivvakapothe read annatu 
       run: |
         MODEL_URI="s3://churn-model-bucket-cicd-abhi/models/churn_model.pkl"
         sed -i "s|storageUri: .*|storageUri: $MODEL_URI|g" k8s/inference.yaml
-    ikkada manam inference.yaml lo storage uri lo s3 bucket address ni replace chastunnamu already unna stoage uri ni
-    (storageUri: s3://churn-model-bucket-cicd-abhi/models/churn_model.pkl) push to s3 directory step lo unna 
-    s3 bucket address s3://churn-model-bucket-cicd-abhi/models/churn_model.pkl  tho replace chasthundi
+   # ikkada manam inference.yaml lo storage uri lo s3 bucket address ni replace chastunnamu already unna stoage uri ni
+   # (storageUri: s3://churn-model-bucket-cicd-abhi/models/churn_model.pkl) push to s3 directory step lo unna 
+   # s3 bucket address s3://churn-model-bucket-cicd-abhi/models/churn_model.pkl  tho replace chasthundi
     
     - name: Commit updated inference.yaml
       run: |
