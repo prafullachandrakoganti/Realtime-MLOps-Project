@@ -152,6 +152,8 @@ kubectl get inferenceservice churn-predictor -n churn-model -w
 
 (first we install kubernetes then we install kserve, kserve is the crd of kubernetes, kserve only manages inference service object so we need to create inference.yaml mandatory then inference service object is created. then only kseve controller (kserve) will watch these objects and automatically creats necessary pods,services and networking and autoscaling . Inside infernce object we will specify sb bucket location where model artifact is stored then kserve controller does its job )
 
+(here we are storing model in s3 kserve cannot directly access s3 as its private so we will create serviceaccount.yaml in kubernetes along with infernce.yaml and inside the service account we will add secret and that secret will have aws credntials which has access to s3 bucket then serviceaccount.yaml is ready now in the inference.yaml we have to provide the name of the serviceaccount and boom kserve takes care of remaining like creating pods and ......)
+
 ### 7. Test KServe Inference
 
 ```bash
