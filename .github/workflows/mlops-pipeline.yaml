@@ -1,11 +1,10 @@
-name: MLOps Pipeline
+name: MLOps Pipeline with DVC
 
 on:
   push:
     branches: [cicd]
   workflow_dispatch:
 
-# throughout the workflow if we want any env variables to define we weill put only in this session
 env:
   AWS_REGION: us-east-1
   S3_BUCKET: churn-model-bucket-cicd-abhi
@@ -14,60 +13,85 @@ jobs:
   train-and-deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Required to push commits
-# permission write ichamu ante github actions ki manam left side lo unna files annitlo github actions ki write permission ichinatte
-# general ga mana read permission ea istam by default emi ivvakapothe read annatu but ikkada delibarate ga write ichamu ee job ki
-    
+      contents: write
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}  # Use built-in token
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    
+
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
-    
-    - name: Generate dataset
-      run: python generate_data.py
-    
-    - name: Train model
-      run: python train.py
-    
+        pip install dvc[s3]   # NEW: install DVC with S3 support
+
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v2
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
-     # ee screts repo settings ki valthe screts and variables and vastadi akkada actions slect chaskoni repository secrets ki valli
-     # create chaskoni scret name = AWS_ACCESS_KEY_ID , scret = awskeyid lo vachina key id and new secret add chaskoni
-     # scret name = AWS_SECRET_ACCESS_KEY , scret = awsscretaccesskey ivvali appudu run ayinappudu akkadanunchi tiskuntadii
-    #  built in scret storage undi actions ki 
-    #  same variables ki kuda chaskovachu
-    
-    - name: Push model to S3 directly
+
+    - name: Generate dataset
+      run: python generate_data.py
+
+    - name: Train model
+      run: python train.py   # Data scientist saves model locally in models/churn_model.pkl
+
+    # -------------------------------
+    # OLD (your pipeline):
+    #   aws s3 cp models/churn_model.pkl s3://bucket/models/churn_model.pkl
+    #   → overwrites the same file each run
+    #
+    # NEW (DVC pipeline):
+    #   dvc add + dvc push
+    #   → creates a new hash each run, stores multiple versions in S3
+    # -------------------------------
+
+    - name: Track model with DVC
       run: |
-        aws s3 cp models/churn_model.pkl s3://churn-model-bucket-cicd-abhi/models/churn_model.pkl
-        echo "Model pushed to S3 is success"
-    
-    - name: Update inference.yaml with S3 model path
+        dvc add models/churn_model.pkl
+        git add models/churn_model.pkl.dvc .gitignore
+        git commit -m "Track new model with DVC" || echo "No changes"
+
+    - name: Push model to S3 via DVC
       run: |
-        MODEL_URI="s3://churn-model-bucket-cicd-abhi/models/churn_model.pkl"
+        dvc remote add origin s3://${S3_BUCKET}/dvcstore
+        dvc push   # NEW: uploads model under hash-based folder, keeps old versions
+
+    - name: Update inference.yaml with DVC path
+      run: |
+        # In practice you’d extract the hash from the .dvc file
+        MODEL_URI="s3://${S3_BUCKET}/dvcstore/<hash>/churn_model.pkl"
         sed -i "s|storageUri: .*|storageUri: $MODEL_URI|g" k8s/inference.yaml
-   # ikkada manam inference.yaml lo storage uri lo s3 bucket address ni replace chastunnamu already unna stoage uri ni
-   # (storageUri: s3://churn-model-bucket-cicd-abhi/models/churn_model.pkl) push to s3 directory step lo unna 
-   # s3 bucket address s3://churn-model-bucket-cicd-abhi/models/churn_model.pkl  tho replace chasthundi
-    
+
     - name: Commit updated inference.yaml
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add k8s/inference.yaml
-        git commit -m "Update model S3 path [skip ci]" || echo "No changes"
+        git commit -m "Update inference.yaml with DVC model path [skip ci]" || echo "No changes"
         git push || echo "No changes to push"
+
+    # ----------------------------------------------------------
+    # 📂 BUCKET VISUALIZATION
+    #
+    # OLD (aws s3 cp approach):
+    # s3://churn-model-bucket-cicd-abhi/
+    # └── models/
+    #     └── churn_model.pkl   <-- overwritten every run
+    #
+    # NEW (DVC approach):
+    # s3://churn-model-bucket-cicd-abhi/dvcstore/
+    # └── ab/1234.../churn_model.pkl   <-- version 1
+    # └── cd/5678.../churn_model.pkl   <-- version 2
+    # └── ef/9012.../churn_model.pkl   <-- version 3
+    #
+    # Difference:
+    # - aws s3 cp → only one file, no history
+    # - DVC → multiple versions stored under hash-based folders, linked to Git commits
+    # ----------------------------------------------------------
